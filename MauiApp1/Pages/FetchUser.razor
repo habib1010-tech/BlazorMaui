@@ -1,0 +1,176 @@
+﻿@page "/fetchuser"
+@using MauiApp1.Data
+@inject UserService UserService
+@inject DialogService DialogService
+
+
+<h1> Users</h1>
+<p style="color:red">@Error</p>
+
+@if (users == null)
+{
+    <!-- Show this if the current user has no data... yet... -->
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="add_circle_outline" class="mt-2 mb-4" Text="Add New User" Click="@AddNewUser" />
+    <RadzenDataGrid Responsive="true" AllowFiltering="true" AllowColumnResize="true" AllowAlternatingRows="false" FilterMode="FilterMode.Advanced" AllowSorting="true" PageSize="5" AllowPaging="true" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true"
+                Data="@users" TItem="UserModel" ColumnWidth="300px" LogicalFilterOperator="LogicalFilterOperator.Or">
+        <Columns>
+            <RadzenDataGridColumn TItem="UserModel" Title="Photo" Frozen="true" Sortable="false" Filterable="false" Width="160px" TextAlign="TextAlign.Center">
+                <Template Context="data">
+                    <RadzenImage Path="@data.Photo" class="rz-gravatar"  />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="UserModel" Property="Name" Title="Name" Width="160px" />
+            <RadzenDataGridColumn TItem="UserModel" Title="Birthday" Frozen="true" Sortable="false" Filterable="false" Width="160px" TextAlign="TextAlign.Center">
+                <Template Context="data">
+                    @data.Birthday.ToShortDateString()
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="UserModel" Property="Email" Title="Email" Width="200px" />
+            <RadzenDataGridColumn TItem="UserModel" Title="Created At" Frozen="true" Sortable="false" Filterable="false" Width="160px" TextAlign="TextAlign.Center">
+                <Template Context="data">
+                    @data.CreatedAt.ToShortDateString()
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="UserModel" Context="order" Filterable="false" Sortable="false" TextAlign="TextAlign.Right" Width="156px">
+                <Template Context="data">
+                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium" Click="@(args =>EditUser(data))" @onclick:stopPropagation="true">
+                    </RadzenButton>
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Variant="Variant.Flat" Shade="Shade.Lighter" Size="ButtonSize.Medium" class="my-1 ms-1" Click="@(args => DeleteUser(data))" @onclick:stopPropagation="true">
+                    </RadzenButton>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+
+}
+
+@code
+{
+    string Error = "";
+    string fileName;
+    long? fileSize;
+    List<UserModel> users = new List<UserModel>();
+    UserModel objUser = new UserModel();
+    protected override async Task OnInitializedAsync()
+    {
+        // Get the users
+        users = await UserService.GetUserAsync();
+
+
+    }
+
+    void AddNewUser()
+    {
+        // Make new forecast
+        objUser = new UserModel();
+        // Set Id to 0 so we know it is a new record
+        objUser.Id = 0;
+        // Open the Popup
+        ShowInlineDialog();
+    }
+    void EditUser(UserModel user)
+    {
+        // Set the selected forecast
+        // as the current forecast
+        objUser = user;
+        // Open the Popup
+        ShowInlineDialog();
+    }
+
+
+    async Task SaveUser()
+    {
+        // Close the Popup
+        DialogService.Close();
+        Error = "";
+        try
+        {
+            // A new forecast will have the Id set to 0
+            if (objUser.Id == 0)
+            {
+                // Create new forecast
+                UserModel objNewUser = new UserModel();
+                objNewUser.CreatedAt = System.DateTime.Now;
+                objNewUser.Name = objUser.Name;
+                objNewUser.Birthday = objUser.Birthday;
+                objNewUser.Email = objUser.Email;
+                objNewUser.Photo = objUser.Photo;
+
+                // Save the result
+                var NewUser =
+            await UserService.CreateUserAsync(objNewUser);
+                // Add the Forcast
+                users.Add(NewUser);
+                users = await UserService.GetUserAsync();
+            }
+            else
+            {
+                // This is an update
+                await UserService.UpdateUserAsync(objUser);
+            }
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+    }
+
+    async Task DeleteUser(UserModel user)
+    {
+        try
+        {
+            Error = "";
+            // Delete the forecast
+            await UserService.DeleteUserAsync(user);
+            // Remove the Forcast
+            users.Remove(user);
+            users = await UserService.GetUserAsync();
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+    }
+
+    async Task ShowInlineDialog()
+    {
+        var result = await DialogService.OpenAsync("User", ds =>
+    @<RadzenRow Gap="1rem">
+        <RadzenColumn Size="12" SizeSM="12">
+            <RadzenStack>
+                <RadzenFormField Text="Name" Variant="@Variant.Outlined">
+                    <RadzenTextBox @bind-Value="@objUser.Name" />
+                </RadzenFormField>
+                <RadzenFormField Text="Birthday" Variant="@Variant.Outlined">
+                    <RadzenDatePicker @bind-Value="@objUser.Birthday" />
+                </RadzenFormField>
+                <RadzenFormField Text="Email" Variant="@Variant.Outlined">
+                    <RadzenTextBox @bind-Value="@objUser.Email" />
+                </RadzenFormField>
+                <RadzenFormField Text="" Variant="@Variant.Outlined">
+                    <RadzenFileInput @bind-Value=@objUser.Photo @bind-FileName=@fileName @bind-FileSize=@fileSize TValue="string" class="w-100"
+                                 Change=@(args => OnChange(args, "FileInput")) Error=@(args => OnError(args, "FileInput")) />
+                </RadzenFormField>
+                <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="save" class="mt-2 mb-4" Text="Save" Click="@SaveUser" />
+
+            </RadzenStack>
+        </RadzenColumn>
+        </RadzenRow>
+    );
+    }
+
+    void OnChange(string value, string name)
+    {
+
+    }
+
+    void OnError(UploadErrorEventArgs args, string name)
+    {
+        
+    }
+
+}

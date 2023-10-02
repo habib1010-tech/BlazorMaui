@@ -1,0 +1,149 @@
+﻿@page "/fetchdata"
+@using MauiApp1.Data
+@inject WeatherForecastService ForecastService
+@inject DialogService DialogService
+
+
+<h1>Weather forecast</h1>
+<p style="color:red">@Error</p>
+
+@if (forecasts == null)
+{
+    <!-- Show this if the current user has no data... yet... -->
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="add_circle_outline" class="mt-2 mb-4" Text="Add New Forecast" Click="@AddNewForecast" />
+    <RadzenDataGrid Responsive="true" AllowFiltering="true" AllowColumnResize="true" AllowAlternatingRows="false" FilterMode="FilterMode.Advanced" AllowSorting="true" PageSize="5" AllowPaging="true" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true"
+                Data="@forecasts" TItem="WeatherForecast" ColumnWidth="300px" LogicalFilterOperator="LogicalFilterOperator.Or">
+        <Columns>
+            <RadzenDataGridColumn TItem="WeatherForecast" Title="Date" Frozen="true" Sortable="false" Filterable="false" Width="160px" TextAlign="TextAlign.Center">
+                <Template Context="data">
+                    @data.Date.ToShortDateString()
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="WeatherForecast" Property="TemperatureC" Title="Temp. (C)" Width="160px" />
+            <RadzenDataGridColumn TItem="WeatherForecast" Property="TemperatureF" Title="Temp. (F)" Width="160px" />
+            <RadzenDataGridColumn TItem="WeatherForecast" Property="Summary" Title="Summary" Width="200px" />
+            <RadzenDataGridColumn TItem="WeatherForecast" Context="order" Filterable="false" Sortable="false" TextAlign="TextAlign.Right" Width="156px">
+                <Template Context="data">
+                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Medium" Click="@(args =>EditForecast(data))" @onclick:stopPropagation="true">
+                    </RadzenButton>
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Variant="Variant.Flat" Shade="Shade.Lighter" Size="ButtonSize.Medium" class="my-1 ms-1" Click="@(args => DeleteForecast(data))" @onclick:stopPropagation="true">
+                    </RadzenButton>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+
+}
+
+@code
+{
+    string Error = "";
+    List<WeatherForecast> forecasts = new List<WeatherForecast>();
+    WeatherForecast objWeatherForecast = new WeatherForecast();
+    protected override async Task OnInitializedAsync()
+    {
+        // Get the forecasts
+       forecasts = await ForecastService.GetForecastAsync();
+       
+
+    }
+
+    void AddNewForecast()
+    {
+        // Make new forecast
+        objWeatherForecast = new WeatherForecast();
+        // Set Id to 0 so we know it is a new record
+        objWeatherForecast.Id = 0;
+        // Open the Popup
+        ShowInlineDialog();
+    }
+    void EditForecast(WeatherForecast weatherForecast)
+    {
+        // Set the selected forecast
+        // as the current forecast
+        objWeatherForecast = weatherForecast;
+        // Open the Popup
+        ShowInlineDialog();
+    }
+
+
+    async Task SaveForecast()
+    {
+        // Close the Popup
+        DialogService.Close();
+        Error = "";
+        try
+        {
+            // A new forecast will have the Id set to 0
+            if (objWeatherForecast.Id == 0)
+            {
+                // Create new forecast
+                WeatherForecast objNewWeatherForecast = new WeatherForecast();
+                objNewWeatherForecast.Date = System.DateTime.Now;
+                objNewWeatherForecast.Summary = objWeatherForecast.Summary;
+                objNewWeatherForecast.TemperatureC =
+                Convert.ToInt32(objWeatherForecast.TemperatureC);
+                objNewWeatherForecast.TemperatureF =
+                Convert.ToInt32(objWeatherForecast.TemperatureF);
+                // Save the result
+                var NewWeatherForecast =
+                await ForecastService.CreateForecastAsync(objNewWeatherForecast);
+                // Add the Forcast
+                forecasts.Add(NewWeatherForecast);
+                forecasts = await ForecastService.GetForecastAsync();
+            }
+            else
+            {
+                // This is an update
+                await ForecastService.UpdateForecastAsync(objWeatherForecast);
+            }
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+    }
+
+    async Task DeleteForecast(WeatherForecast weatherForecast)
+    {
+        try
+        {
+            Error = "";
+            // Delete the forecast
+            await ForecastService.DeleteForecastAsync(weatherForecast);
+            // Remove the Forcast
+            forecasts.Remove(weatherForecast);
+            forecasts = await ForecastService.GetForecastAsync();
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+    }
+
+    async Task ShowInlineDialog()
+    {
+        var result = await DialogService.OpenAsync("Forecast", ds =>
+    @<RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeSM="12">
+                <RadzenStack>
+                    <RadzenFormField Text="Celsius forecast" Variant="@Variant.Outlined">
+                        <RadzenNumeric @bind-Value="@objWeatherForecast.TemperatureC" />
+                    </RadzenFormField>
+                    <RadzenFormField Text="Fahrenheit forecast" Variant="@Variant.Outlined">
+                        <RadzenNumeric @bind-Value="@objWeatherForecast.TemperatureF" />
+                    </RadzenFormField>
+                    <RadzenFormField Text="Summary" Variant="@Variant.Outlined">
+                            <RadzenTextBox @bind-Value="@objWeatherForecast.Summary" />
+                        </RadzenFormField>
+                        <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="save" class="mt-2 mb-4" Text="Save" Click="@SaveForecast" />
+
+                    </RadzenStack>
+                </RadzenColumn>
+    </RadzenRow>);
+    }
+}
